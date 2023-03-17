@@ -1,4 +1,4 @@
-# importing foofe librarry
+# importing google librarry
 from google.cloud import bigquery
 from google.oauth2 import service_account
 
