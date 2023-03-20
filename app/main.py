@@ -2,55 +2,43 @@ import os
 from typing import List
 import argparse
 import re
+import json
 from google.cloud import bigquery
 from google.oauth2 import service_account
 
-googleBigQry = "gbq"
-snowflake = "snow"
-dataSrcs = [googleBigQry,snowflake]
+googleBigQry = "bigquery"
+snowflake = "snowflake"
+dataSrcs = [googleBigQry, snowflake]
+
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--input", "-i", type=str, required=True)
+    parser.add_argument("--datasource", type=str, required=True,
+                        help="Enter the Data source, options are bigquery")
+    parser.add_argument("--credentials", type=str, required=True,
+                        help="Enter the URL for credentials file")
+    parser.add_argument("--projectid", type=str, required=True,
+                        help="Enter the Big Query Project ID")
     args = parser.parse_args()
-    data_src = args.input
-
-    print(f"Data Source given is: {data_src}")
+    data_src = args.datasource
+    credentials = args.credentials
+    projectid = args.projectid
 
     if (validate_datasource(data_src)):
-        print(f"Data Source {data_src} is supported. Connecting...")
 
-        if data_src == googleBigQry:
+        client = connectSrc(data_src, credentials, projectid)
 
-            # Based on Data source type, ask additional arguments specific to connect to each data source:
-            # For Google Biqquery it will be projectID, credentials, query
+        # Add additional logic to display schema and return the SQL formed
+        # Give a drag+drop UI and a SQL writing UI
+        query = getSQL(data_src, client)
 
-            credentials = str(input("Enter the path to credentials JSON file:"))
-            projectID = str(input("Enter the project ID:"))
-
-            ############### Start: hardcoded for testing
-            # credentials = service_account.Credentials.from_service_account_file(credentials)
-            credentials = service_account.Credentials.from_service_account_file('/home/john/Documents/revEtlUser_GCP_Bigquery_key/revEtlUser_GCP_Bigquery_key.json')
-            projectID = 'ecom1-377114'
-            ############### End: hardcoded for testing
-
-            # Add additional logic to display schema and
-            # an interface for users to generate query (drag/drop UI plus writing SQL interface)
-
-            ############### Start: hardcoded for testing
-            query = str(input("Enter the SQL query:"))
-            query = """SELECT * FROM olist_dw.customer_dim LIMIT 3"""
-            ############### End: hardcoded for testing
-
-            runSql_bigquery(credentials, projectID, query)
-
-        # elif data_src == snowflake:
-        #     runSql_snowflake(credentials, projectID, query)
+        results = runSQL(data_src, client, query)
 
     else:
         raise ValueError(
-            f"Submitted data source {data_src}, is not supported! Only Google BigQuery (gbq) is supported currently."
+            f"Submitted data source {data_src}, is not supported! Only Google BigQuery is supported currently."
         )
+
 
 def validate_datasource(prompt: str) -> bool:
     res = 1
@@ -58,12 +46,34 @@ def validate_datasource(prompt: str) -> bool:
         res = 0
     return res
 
-def runSql_bigquery(credentials, projectID, query):
-    client = bigquery.Client(credentials=credentials, project=projectID)
-    query_job = client.query(query)
-    results = query_job.result()
-    for row in results:
-        print(row)
+
+def connectSrc(data_src, credentials, projectID):
+    if data_src == googleBigQry:
+        # Start: hardcoded for testing
+        # credentials = service_account.Credentials.from_service_account_file(credentials)
+        credentials = service_account.Credentials.from_service_account_file(
+            '/home/john/Documents/revEtlUser_GCP_Bigquery_key/revEtlUser_GCP_Bigquery_key.json')
+        projectID = 'ecom1-377114'
+        # End: hardcoded for testing
+        client = bigquery.Client(credentials=credentials, project=projectID)
+    return client
+
+
+def getSQL(data_src, client):
+    if data_src == googleBigQry:
+        # query = str(input("Enter the SQL query:"))
+        # Show the first name and mail id of customers who have purchased atleast 3 times between Jan-2018 to Mar-2018 and have given review rating of 2 or below
+        query = """select distinct cust.first_name, cust.email_address as email, cust.contact_number1 as contact, date(ordr.order_purchase_timestamp), ordr.review_score, count(distinct ordr.order_id) as nbr_of_orders from olist_dw.customer_dim cust inner join olist_dw.order_dim ordr on ordr.cuid = cust.cuid where date(ordr.order_purchase_timestamp) between '2018-01-01' and '2018-03-31' and ordr.review_score <= 2 group by cust.first_name, cust.email_address, cust.contact_number1, date(ordr.order_purchase_timestamp), ordr.review_score having count(distinct ordr.order_id) >= 3"""
+        # query = """select distinct cust.first_name, cust.email_address as email, cust.contact_number1 as contact, date(ordr.order_purchase_timestamp), ordr.review_score, count(distinct ordr.order_id) as nbr_of_orders from olist_dw.customer_dim cust inner join olist_dw.order_dim ordr on ordr.cuid = cust.cuid group by cust.first_name, cust.email_address, cust.contact_number1, date(ordr.order_purchase_timestamp), ordr.review_score """
+        return query
+
+
+def runSQL(data_src, client, query):
+    if data_src == googleBigQry:
+        query_job = client.query(query)
+        results = query_job.result()
+        return results
+
 
 if __name__ == "__main__":
     main()
