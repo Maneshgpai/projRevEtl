@@ -2,13 +2,12 @@ import os
 from typing import List
 import argparse
 import re
-import json
 from google.cloud import bigquery
 from google.oauth2 import service_account
 
+# Supported data sources
 googleBigQry = "bigquery"
-snowflake = "snowflake"
-dataSrcs = [googleBigQry, snowflake]
+dataSrcs = [googleBigQry]
 
 
 def main():

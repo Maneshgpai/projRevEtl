@@ -1,9 +1,10 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from main import connectSrc, getSQL, runSQL, validate_datasource
 import json
+from mangum import Mangum
 
 revetl_app = FastAPI()
-
+handler = Mangum(revetl_app)
 
 @revetl_app.get("/connect_to_source")
 async def connect_to_source(data_source: str = "bigquery"
@@ -15,9 +16,7 @@ async def connect_to_source(data_source: str = "bigquery"
         query = getSQL(data_source, client)
         results = runSQL(data_source, client, query)
         records = [dict(row) for row in results]
-        print(f"Records from query: {records}")
         json_obj = json.dumps(str(records))
-        print(f"Records from query (JSON format): {json_obj}")
         return ({json_obj})
     else:
         raise ValueError(
